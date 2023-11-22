@@ -7,6 +7,7 @@ import (
 
 func main() {
 	router := gin.Default()
+	routes.AuthRouter(router)
 	routes.Routes(router)
 	err := router.Run("127.0.0.1:8080")
 
