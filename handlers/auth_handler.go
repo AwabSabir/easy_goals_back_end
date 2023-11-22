@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
-	"time"
 )
 
 func LoginUser(c *gin.Context) {
@@ -17,7 +16,6 @@ func LoginUser(c *gin.Context) {
 		Status:  true,
 		Message: "Login sucessfully",
 		Code:    "LOGIN_API",
-		Data:    map[string]string{"name": "awab Sabir"},
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -38,23 +36,37 @@ func RegisterUser(c *gin.Context) {
 		}
 		c.JSON(400, response)
 	} else {
-		added, user := userInsertIntoDb(userModel)
-		if added {
-			log.Println(userModel)
-			response := model.BaseModel{
-				Status:  true,
-				Message: "Register sucessfuly please varify",
-				Code:    "REGISTER_API",
-				Data:    user,
-			}
-			c.JSON(http.StatusOK, response)
-		} else {
+		userFounded, _ := findUser(userModel.Email)
+		if userFounded {
 			response := model.BaseModel{
 				Status:  false,
-				Message: validate,
+				Message: "User Already Registerd",
 				Code:    "REGISTER_API",
 			}
 			c.JSON(400, response)
+		} else {
+			added, user := userInsertIntoDb(userModel)
+			if added {
+				log.Println(userModel)
+				response := model.BaseModel{
+					Status:  true,
+					Message: "Register sucessfuly please varify",
+					Code:    "REGISTER_API",
+					Data: map[string]any{
+						"name":      user.Name,
+						"email":     user.Email,
+						"createdAt": user.CreatedAt,
+					},
+				}
+				c.JSON(http.StatusOK, response)
+			} else {
+				response := model.BaseModel{
+					Status:  false,
+					Message: "some thing went wrrong",
+					Code:    "REGISTER_API",
+				}
+				c.JSON(400, response)
+			}
 		}
 	}
 
@@ -88,10 +100,9 @@ func userInsertIntoDb(userModel *model.User) (bool, model.User) {
 			id        int
 			fName     string
 			email     string
-			password  string
 			createdAt string
 		)
-		err = database.QueryRow("SELECT * FROM `users` WHERE `id` = ?", lastInsertId).Scan(&id, &fName, &email, &password, &createdAt)
+		err = database.QueryRow("SELECT  id,fName, email, created_at FROM `users` WHERE `id` = ?", lastInsertId).Scan(&id, &fName, &email, &createdAt)
 		if err != nil {
 			log.Panic(err.Error())
 		}
@@ -118,7 +129,7 @@ func GetAllUser(c *gin.Context) {
 		}
 	}(databasee)
 
-	var data, err = databasee.Query("SELECT * FROM `users`")
+	var data, err = databasee.Query("SELECT id,fName, email, created_at From users; ")
 	if err != nil {
 		log.Panicf(err.Error())
 	}
@@ -126,19 +137,16 @@ func GetAllUser(c *gin.Context) {
 	var usrsList []model.User
 	for data.Next() {
 		var (
-			id        int
-			fName     string
-			email     string
-			password  string
-			createdAt time.Time
+			id    int
+			fName string
+			email string
 		)
-		if err := data.Scan(&id, &fName, &email, &password, &createdAt); err != nil {
+		if err := data.Scan(&id, &fName, &email); err != nil {
 			log.Panicf(err.Error())
 		}
 		usrsList = append(usrsList, model.User{
-			Name:     fName,
-			Email:    email,
-			Password: password,
+			Name:  fName,
+			Email: email,
 		})
 	}
 	c.JSON(http.StatusOK, model.BaseModel{
@@ -148,4 +156,32 @@ func GetAllUser(c *gin.Context) {
 		Data:    usrsList,
 	})
 
+}
+
+func findUser(email string) (bool, model.User) {
+	myDb := db.ConnectDb()
+	defer myDb.Close()
+	query := "SELECT fName, email, created_at FROM users WHERE email=?"
+	var (
+		fName     string
+		userEmail string
+		createdAt *string
+	)
+	data, err := myDb.Query(query, email)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	if data.Next() {
+		data.Scan(&fName, &userEmail, &createdAt)
+	} else {
+		return false, model.User{}
+	}
+	if userEmail != "" {
+		return true, model.User{
+			Email:     userEmail,
+			Name:      fName,
+			CreatedAt: createdAt,
+		}
+	}
+	return false, model.User{}
 }
