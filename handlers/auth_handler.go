@@ -12,12 +12,49 @@ import (
 )
 
 func LoginUser(c *gin.Context) {
-	response := model.BaseModel{
-		Status:  true,
-		Message: "Login sucessfully",
-		Code:    "LOGIN_API",
+	var request = &model.LoginModel{}
+	err := c.ShouldBindJSON(request)
+	if err != nil {
+		c.JSON(400, model.BaseModel{
+			Status:  false,
+			Message: err.Error(),
+			Code:    "LOGIN_API",
+		})
+		log.Panic(err.Error())
+		return
 	}
-	c.JSON(http.StatusOK, response)
+	log.Print(request)
+	myDb := db.ConnectDb()
+	defer myDb.Close()
+
+	query := "SELECT id,fName, email, created_at FROM `users` WHERE email=? AND password = ?"
+	var (
+		id        int
+		fName     string
+		email     string
+		createdAt string
+	)
+	err = myDb.QueryRow(query, request.Email, request.Password).Scan(&id, &fName, &email, &createdAt)
+	if err != nil {
+		c.JSON(400, model.BaseModel{
+			Status:  false,
+			Message: "User not found",
+			Code:    "LOGIN_API",
+		})
+		log.Panic(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, model.BaseModel{
+		Status:  true,
+		Message: "Login Sucessfuly",
+		Code:    "LOGIN API",
+		Data: gin.H{
+			"id":        id,
+			"Name":      fName,
+			"email":     email,
+			"createdAt": createdAt,
+		},
+	})
 }
 
 func RegisterUser(c *gin.Context) {
@@ -184,4 +221,10 @@ func findUser(email string) (bool, model.User) {
 		}
 	}
 	return false, model.User{}
+}
+
+func LoginUserDatabase(emai, password string) {
+	database := db.ConnectDb()
+	defer database.Close()
+
 }
