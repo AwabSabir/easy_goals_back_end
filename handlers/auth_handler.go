@@ -222,9 +222,3 @@ func findUser(email string) (bool, model.User) {
 	}
 	return false, model.User{}
 }
-
-func LoginUserDatabase(emai, password string) {
-	database := db.ConnectDb()
-	defer database.Close()
-
-}
